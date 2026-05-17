@@ -91,6 +91,30 @@ async def healthz() -> dict[str, object]:
     return {"ok": True, "ollama": ollama_ok}
 
 
+_UPLOAD_CHUNK_BYTES = 1024 * 1024  # 1 MB
+
+
+async def _read_upload_capped(upload: UploadFile, remaining: int) -> bytes:
+    """Stream an upload in chunks, aborting once ``remaining`` bytes are exceeded.
+
+    Prevents fully buffering a hostile multi-hundred-MB body before the size
+    check fires. The Uvicorn/ASGI layer should also be started with
+    ``--limit-max-request-body-size`` as defense in depth.
+    """
+    buf = bytearray()
+    while True:
+        chunk = await upload.read(_UPLOAD_CHUNK_BYTES)
+        if not chunk:
+            break
+        if len(chunk) > remaining - len(buf):
+            raise HTTPException(
+                status_code=413,
+                detail="upload exceeds max allowed bytes",
+            )
+        buf.extend(chunk)
+    return bytes(buf)
+
+
 @app.post("/analyze", status_code=status.HTTP_202_ACCEPTED)
 async def analyze(
     files: list[UploadFile] = File(...),
@@ -99,15 +123,16 @@ async def analyze(
     if not files:
         raise HTTPException(status_code=400, detail="no files uploaded")
 
+    max_bytes = settings.max_upload_bytes
     total = 0
     payloads: list[tuple[str, bytes]] = []
     for upload in files:
-        raw = await upload.read()
+        raw = await _read_upload_capped(upload, max_bytes - total)
         total += len(raw)
-        if total > settings.max_upload_bytes:
+        if total > max_bytes:
             raise HTTPException(
                 status_code=413,
-                detail=f"upload exceeds {settings.max_upload_bytes} bytes",
+                detail=f"upload exceeds {max_bytes} bytes",
             )
         payloads.append((upload.filename or "upload.bin", raw))
 
