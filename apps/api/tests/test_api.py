@@ -12,6 +12,7 @@ import pytest
 import respx
 from fastapi.testclient import TestClient
 
+from app.config import get_settings
 from app.main import app
 
 OLLAMA_URL = "http://test-ollama:11434"
@@ -39,6 +40,20 @@ def test_analyze_rejects_empty_request() -> None:
         resp = client.post("/analyze")
     # FastAPI 422 because `files` is required.
     assert resp.status_code == 422
+
+
+def test_analyze_rejects_oversized_upload(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Upload larger than max_upload_bytes is rejected before full buffering."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "max_upload_bytes", 1024)
+    big_payload = b"a" * 4096
+    with TestClient(app) as client:
+        resp = client.post(
+            "/analyze",
+            files={"files": ("big.bin", big_payload, "application/octet-stream")},
+        )
+    assert resp.status_code == 413
+    assert "exceeds" in resp.json()["detail"]
 
 
 def test_analyze_rejects_zip_slip_upload() -> None:

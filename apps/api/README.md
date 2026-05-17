@@ -7,8 +7,14 @@ FastAPI service that ingests project files, prompts Ollama, and returns an IFPUG
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000 --limit-max-request-body-size 55000000
 ```
+
+The `--limit-max-request-body-size` flag enforces the upload cap at the ASGI
+layer so hostile clients cannot make the process buffer hundreds of megabytes
+before the in-app size check fires. Keep it slightly above `MAX_UPLOAD_BYTES`
+to allow for multipart envelope overhead. The application also streams uploads
+in chunks and aborts once `MAX_UPLOAD_BYTES` is exceeded.
 
 Make sure Ollama is running locally:
 

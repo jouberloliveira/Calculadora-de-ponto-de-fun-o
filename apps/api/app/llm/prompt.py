@@ -8,6 +8,7 @@ is then re-validated by Pydantic in the caller.
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Iterable
 
 from app.ingest import ExtractedFile
@@ -54,6 +55,18 @@ def _sanitize(text: str) -> str:
     return out
 
 
+def _safe_filename(name: str) -> str:
+    """Strip Unicode control characters from a filename.
+
+    Archive member filenames and HTTP multipart filenames are attacker-controlled
+    and embedded directly in the LLM prompt header. A name containing embedded
+    newlines or other control chars could break out of the header and inject
+    instructions. ``unicodedata.category`` starts with ``C`` for all control
+    categories (Cc, Cf, Cn, Co, Cs).
+    """
+    return "".join(ch for ch in name if not unicodedata.category(ch).startswith("C"))
+
+
 def build_prompt(
     files: Iterable[ExtractedFile],
     *,
@@ -63,7 +76,7 @@ def build_prompt(
     blocks: list[str] = []
     used = 0
     for f in files:
-        header = f"\n--- FILE: {f.name} ---\n"
+        header = f"\n--- FILE: {_safe_filename(f.name)} ---\n"
         budget = max_total_chars - used - len(header)
         if budget <= 0:
             break
