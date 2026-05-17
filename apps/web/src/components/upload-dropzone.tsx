@@ -68,7 +68,7 @@ export function UploadDropzone({ onSubmit, submitting = false, className }: Uplo
         {...getRootProps()}
         data-testid="dropzone"
         className={cn(
-          "flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-input bg-background p-8 text-center cursor-pointer transition-colors hover:bg-accent/40",
+          "flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-input bg-background p-6 text-center cursor-pointer transition-colors hover:bg-accent/40 sm:p-8",
           isDragActive && "border-primary bg-accent/60"
         )}
       >
@@ -114,7 +114,7 @@ export function UploadDropzone({ onSubmit, submitting = false, className }: Uplo
         </ul>
       )}
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground" aria-live="polite">
           {files.length === 0
             ? "No files selected"

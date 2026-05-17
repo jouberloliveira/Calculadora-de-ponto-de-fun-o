@@ -50,7 +50,7 @@ function Row({ fn }: { fn: FpaFunction }) {
             {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </TableCell>
-        <TableCell className="font-medium">{fn.name}</TableCell>
+        <TableCell className="break-words font-medium">{fn.name}</TableCell>
         <TableCell>
           <ComplexityBadge complexity={fn.complexity} />
         </TableCell>

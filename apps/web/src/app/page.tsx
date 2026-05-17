@@ -17,7 +17,7 @@ export default function HomePage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Function Point Analysis</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Function Point Analysis</h1>
         <p className="mt-1 text-muted-foreground">
           Upload project files and get an IFPUG-style function point breakdown produced by a local LLM.
         </p>

@@ -17,8 +17,8 @@ export default function AnalyzePage({ params }: { params: { jobId: string } }) {
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Analysis</h1>
-          <p className="text-xs text-muted-foreground">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Analysis</h1>
+          <p className="break-all text-xs text-muted-foreground">
             Job <span className="font-mono">{params.jobId}</span>
           </p>
         </div>
