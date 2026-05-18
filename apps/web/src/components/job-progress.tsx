@@ -39,7 +39,7 @@ function useJobStream(jobId: string): StreamState & { sseFailed: boolean } {
     }
     let reconnects = 0;
 
-    es.onmessage = (ev) => {
+    const handleStatusEvent = (ev: MessageEvent) => {
       if (cancelled) return;
       try {
         const payload = JSON.parse(ev.data) as Partial<FpaResult> & { progress?: number };
@@ -56,6 +56,8 @@ function useJobStream(jobId: string): StreamState & { sseFailed: boolean } {
         /* ignore malformed event */
       }
     };
+
+    es.addEventListener("status", handleStatusEvent);
 
     es.onerror = () => {
       reconnects += 1;
