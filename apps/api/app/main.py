@@ -1,7 +1,5 @@
 """FastAPI entrypoint."""
 
-from __future__ import annotations
-
 import asyncio
 import logging
 from contextlib import asynccontextmanager
@@ -12,11 +10,15 @@ from fastapi import (
     FastAPI,
     File,
     HTTPException,
+    Request,
     UploadFile,
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from sse_starlette.sse import EventSourceResponse
 
 from app.config import Settings, get_settings
@@ -30,6 +32,8 @@ from app.ingest import (
 from app.jobs import Job, JobEvent, JobStore
 from app.llm import OllamaClient, OllamaError, OllamaInvalidResponse, build_prompt
 from app.llm.prompt import SYSTEM_PROMPT
+
+limiter = Limiter(key_func=get_remote_address)
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +61,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="FPA API", version="0.1.0", lifespan=lifespan)
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-store",
+}
+
 
 @app.middleware("http")
-async def _attach_cors(request, call_next):  # pragma: no cover - thin glue
-    return await call_next(request)
+async def _attach_security_headers(request, call_next):
+    response = await call_next(request)
+    for header, value in _SECURITY_HEADERS.items():
+        response.headers[header] = value
+    if "server" in response.headers:
+        del response.headers["server"]
+    return response
 
 
 def _settings_dep() -> Settings:
@@ -116,7 +135,9 @@ async def _read_upload_capped(upload: UploadFile, remaining: int) -> bytes:
 
 
 @app.post("/analyze", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("10/minute")
 async def analyze(
+    request: Request,
     files: list[UploadFile] = File(...),
     settings: Settings = Depends(_settings_dep),
 ) -> dict[str, str]:
@@ -185,10 +206,10 @@ async def _run_job(job_id: str, files_extracted) -> None:
         await store.update_status(
             job_id, "error", message=str(exc), error=str(exc)
         )
-    except Exception as exc:  # noqa: BLE001 - surface anything to client
+    except Exception:  # noqa: BLE001
         logger.exception("job %s failed: unexpected", job_id)
         await store.update_status(
-            job_id, "error", message=str(exc), error=str(exc)
+            job_id, "error", message="internal error", error="internal error"
         )
 
 
