@@ -97,15 +97,30 @@ export function JobProgress({ jobId, onDone }: JobProgressProps) {
       }
     : stream;
 
+  const pollingErrorMessage = stream.sseFailed && !polling.data && polling.error
+    ? polling.error instanceof Error
+      ? polling.error.message
+      : String(polling.error)
+    : null;
+
   React.useEffect(() => {
     if (effective.status === "done" && effective.result && onDone) {
       onDone(effective.result);
     }
   }, [effective.status, effective.result, onDone]);
 
+  if (pollingErrorMessage) {
+    return (
+      <Alert variant="destructive" data-testid="job-progress-error">
+        <AlertTitle>Analysis failed</AlertTitle>
+        <AlertDescription>{pollingErrorMessage}</AlertDescription>
+      </Alert>
+    );
+  }
+
   if (effective.status === "error") {
     return (
-      <Alert variant="destructive">
+      <Alert variant="destructive" data-testid="job-progress-error">
         <AlertTitle>Analysis failed</AlertTitle>
         <AlertDescription>{effective.message ?? "Unknown error"}</AlertDescription>
       </Alert>

@@ -55,9 +55,23 @@ export async function uploadFiles(files: File[]): Promise<{ jobId: string }> {
 }
 
 export async function getJob(jobId: string): Promise<FpaResult> {
-  const res = await fetch(`${API_URL}/analyze/${jobId}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Job fetch failed: ${res.status}`);
-  return res.json();
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/analyze/${jobId}`, { cache: "no-store" });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Job fetch failed: network error (${msg})`);
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Job fetch failed: ${res.status}${text ? ` ${text.slice(0, 200)}` : ""}`);
+  }
+  try {
+    return (await res.json()) as FpaResult;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Job fetch failed: invalid JSON response (${msg})`);
+  }
 }
 
 export function jobStreamUrl(jobId: string): string {
