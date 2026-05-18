@@ -22,6 +22,10 @@ from pdfminer.high_level import extract_text as pdf_extract_text
 
 logger = logging.getLogger(__name__)
 
+_PDF_MAGIC = b"%PDF"
+_ZIP_MAGIC = b"PK\x03\x04"
+_PDF_MAX_PAGES = 500
+
 TEXT_EXTENSIONS = {
     ".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go",
     ".md", ".txt", ".json", ".yml", ".yaml", ".toml",
@@ -59,6 +63,14 @@ def _is_within(base: Path, target: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _check_magic(raw: bytes, ext: str, name: str) -> None:
+    """Reject files whose magic bytes contradict their declared extension."""
+    if ext in PDF_EXTENSIONS and not raw.startswith(_PDF_MAGIC):
+        raise IngestError(f"File does not appear to be a PDF: {name}")
+    if ext in ARCHIVE_EXTENSIONS and not raw.startswith(_ZIP_MAGIC):
+        raise IngestError(f"File does not appear to be a ZIP archive: {name}")
 
 
 def extract_archive(
@@ -157,7 +169,7 @@ def _bytes_to_text(
 ) -> str | None:
     if ext in PDF_EXTENSIONS:
         try:
-            text = pdf_extract_text(io.BytesIO(raw)) or ""
+            text = pdf_extract_text(io.BytesIO(raw), maxpages=_PDF_MAX_PAGES) or ""
         except Exception as exc:  # pdfminer raises broad exceptions
             logger.warning("PDF parse failed for %s: %s", name, exc)
             return None
@@ -193,6 +205,8 @@ def ingest_uploads(
         ext = os.path.splitext(filename)[1].lower()
         if ext not in ACCEPTED_EXTENSIONS:
             continue
+
+        _check_magic(raw, ext, filename)
 
         if ext in ARCHIVE_EXTENSIONS:
             out.extend(
